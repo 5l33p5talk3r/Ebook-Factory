@@ -1,18 +1,23 @@
 name = "ebook-factory"
 main = "worker.ts"
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-08-12"
 compatibility_flags = ["nodejs_compat"]
 
 [site]
 bucket = "./dist"
 
+# Replace the placeholder with the real D1 database UUID before deployment.
 [[d1_databases]]
 binding = "DB"
 database_name = "ebook-factory-db"
 database_id = "YOUR_D1_DATABASE_ID"
+migrations_dir = "db/migrations"
 
 [vars]
 ENVIRONMENT = "production"
-# Set secrets via wrangler secret put GEMINI_API_KEY
-# Set secrets via wrangler secret put PAYPAL_CLIENT_ID
-# Set secrets via wrangler secret put PAYPAL_CLIENT_SECRET
+APP_URL = "https://ebookfactory.org"
+SUPPORT_EMAIL = "bishopn45@ebookfactory.org"
+# Secrets must be configured outside source control:
+# wrangler secret put GEMINI_API_KEY
+# wrangler secret put PAYPAL_CLIENT_ID
+# wrangler secret put PAYPAL_CLIENT_SECRET
