@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { PRODUCTS, getProduct } from './data/products';
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from './server/auth';
+import { apiRateLimit, requestSecurity } from './server/security';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -13,8 +14,11 @@ const PORT = Number(process.env.PORT || 3000);
 const allowedOrigins = (process.env.APP_ORIGIN || 'http://localhost:3000').split(',').map(v => v.trim()).filter(Boolean);
 
 app.disable('x-powered-by');
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : false);
+app.use(requestSecurity);
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
+app.use('/api', apiRateLimit());
 
 app.get('/api/health', (_req, res) => res.json({ success: true, service: 'ebook-factory', status: 'healthy', timestamp: new Date().toISOString() }));
 app.get('/api/products', (_req, res) => res.json({ success: true, products: PRODUCTS }));
