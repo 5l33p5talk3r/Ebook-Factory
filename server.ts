@@ -10,10 +10,7 @@ import { requireAdmin, requireAuth, type AuthenticatedRequest } from './server/a
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const allowedOrigins = (process.env.APP_ORIGIN || 'http://localhost:3000')
-  .split(',')
-  .map(v => v.trim())
-  .filter(Boolean);
+const allowedOrigins = (process.env.APP_ORIGIN || 'http://localhost:3000').split(',').map(v => v.trim()).filter(Boolean);
 
 app.disable('x-powered-by');
 app.use(cors({ origin: allowedOrigins, credentials: true }));
@@ -29,14 +26,12 @@ app.get('/api/products/:id', (req, res) => {
 
 app.post('/api/creator/project', requireAdmin, (req, res) => {
   const { title, niche } = req.body || {};
-  if (typeof title !== 'string' || typeof niche !== 'string' || !title.trim() || !niche.trim()) {
-    return res.status(400).json({ success: false, error: 'Title and niche are required.' });
-  }
+  if (typeof title !== 'string' || typeof niche !== 'string' || !title.trim() || !niche.trim()) return res.status(400).json({ success: false, error: 'Title and niche are required.' });
   return res.status(201).json({ success: true, project: { id: crypto.randomUUID(), title: title.trim(), niche: niche.trim(), status: 'draft', createdAt: new Date().toISOString() } });
 });
 
-app.post('/api/checkout/quote', requireAuth, (req: AuthenticatedRequest, res) => {
-  const ids = Array.isArray(req.body?.productIds) ? req.body.productIds.filter((id: unknown): id is string => typeof id === 'string') : [];
+app.post('/api/checkout/quote', requireAuth, (_req: AuthenticatedRequest, res) => {
+  const ids = Array.isArray(_req.body?.productIds) ? _req.body.productIds.filter((id: unknown): id is string => typeof id === 'string') : [];
   const products = ids.map(id => getProduct(id)).filter(Boolean);
   if (!products.length || products.length !== ids.length) return res.status(400).json({ success: false, error: 'One or more products are invalid.' });
   const total = products.reduce((sum, product) => sum + (product?.price || 0), 0);
@@ -48,8 +43,8 @@ app.post('/api/paypal/create-order', requireAuth, async (req: AuthenticatedReque
     const { createPayPalOrder } = await import('./src/services/paypalServer');
     const ids = Array.isArray(req.body?.productIds) ? req.body.productIds.filter((id: unknown): id is string => typeof id === 'string') : [];
     const products = ids.map(id => getProduct(id)).filter(Boolean);
-    if (!req.user?.uid || !products.length || products.length !== ids.length) return res.status(400).json({ success: false, error: 'Invalid product selection.' });
-    const result = await createPayPalOrder(products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })), req.user.uid);
+    if (!products.length || products.length !== ids.length) return res.status(400).json({ success: false, error: 'Invalid product selection.' });
+    const result = await createPayPalOrder(products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })));
     return res.json(result);
   } catch (error) {
     console.error(error);
@@ -60,8 +55,8 @@ app.post('/api/paypal/create-order', requireAuth, async (req: AuthenticatedReque
 app.post('/api/paypal/capture-order', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const { capturePayPalOrder } = await import('./src/services/paypalServer');
-    if (!req.user?.uid || typeof req.body?.orderId !== 'string' || !req.body.orderId.trim()) return res.status(400).json({ success: false, error: 'PayPal order ID is required.' });
-    const result = await capturePayPalOrder(req.body.orderId.trim(), req.user.uid);
+    if (typeof req.body?.orderId !== 'string' || !req.body.orderId.trim()) return res.status(400).json({ success: false, error: 'PayPal order ID is required.' });
+    const result = await capturePayPalOrder(req.body.orderId.trim());
     return res.json(result);
   } catch (error) {
     console.error(error);
