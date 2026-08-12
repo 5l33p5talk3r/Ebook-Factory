@@ -1,136 +1,34 @@
-import { StorefrontProduct } from "../types/factory";
-
-export const FEATURED_PRODUCTS: StorefrontProduct[] = [
-  {
-    id: "prod-ai-agency-2026",
-    title: "AI Marketing Agency Blueprint",
-    subtitle: "Scale a 6-Figure Automation Agency from Zero",
-    author: "Elena Rostova & AI Studio Labs",
-    niche: "AI Business & Automation",
-    category: "Tech & AI",
-    price: 19.99,
-    coverUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
-    description: "The complete tactical operational handbook for launching and scaling an AI-powered agency. Learn client acquisition workflows, agentic prompt frameworks, and recurring retainer pricing.",
-    rating: 4.9,
-    reviewsCount: 128,
-    salesCount: 1420,
-    pageCount: 184,
-    publishedAt: "2026-05-12",
-    featured: true,
-    formats: ["PDF", "EPUB"],
-    sampleChapter: {
-      title: "Chapter 1: The AI Agency Paradigm Shift",
-      content: "Traditional digital agencies suffer from intense labor overhead and slow delivery cycles. By deploying autonomous agentic workflows and custom Gemini models, a lean 2-person agency can now handle the output of a 20-person traditional team..."
-    }
+{
+  "name": "ebook-factory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ebook Factory — AI-assisted digital publishing and commerce platform.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"tsx server.ts\"",
+    "build": "vite build",
+    "start": "tsx server.ts",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
   },
-  {
-    id: "prod-biohack-sleep",
-    title: "The Deep Sleep Architecture",
-    subtitle: "Scientific Protocols for Peak Cognitive Recovery",
-    author: "Dr. Marcus Vance",
-    niche: "Biohacking & Sleep Science",
-    category: "Health & Longevity",
-    price: 14.99,
-    coverUrl: "https://images.unsplash.com/photo-1511295742362-92c96b124e52?auto=format&fit=crop&w=800&q=80",
-    description: "Optimize circadian rhythms, temperature regulation, light hygiene, and neuro-chemical supplementation for 30% more restorative REM and deep sleep cycles.",
-    rating: 4.8,
-    reviewsCount: 94,
-    salesCount: 890,
-    pageCount: 142,
-    publishedAt: "2026-06-01",
-    featured: true,
-    formats: ["PDF", "EPUB"],
-    sampleChapter: {
-      title: "Chapter 1: The Neurobiology of Sleep Architecture",
-      content: "Sleep is not passive downtime; it is an active glymphatic detox process where metabolic waste is cleared from neural tissue. Understanding adenosine accumulation and light receptors in the SCN is your first leverage point..."
-    }
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.5.0",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.23.12",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
-  {
-    id: "prod-fire-real-estate",
-    title: "Passive Income Real Estate Playbook",
-    subtitle: "Crowdfunded Portfolios & High-Yield REITs",
-    author: "Sarah Lin, CFA",
-    niche: "Real Estate & Wealth",
-    category: "Business & Finance",
-    price: 24.99,
-    coverUrl: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80",
-    description: "Build passive cash flow without managing tenants or fixing pipes. A step-by-step masterclass on fractional property ownership and tax-advantaged real estate syndications.",
-    rating: 4.95,
-    reviewsCount: 210,
-    salesCount: 2310,
-    pageCount: 210,
-    publishedAt: "2026-04-18",
-    featured: true,
-    formats: ["PDF", "EPUB"],
-    sampleChapter: {
-      title: "Chapter 1: Fractional Real Estate & Crowdfunding",
-      content: "Real estate has historically been restricted to high-net-worth investors. Crowdfunding platforms and tokenized syndicates now democratize access to prime commercial real estate with starting capital as low as $500..."
-    }
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.2",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.3"
   },
-  {
-    id: "prod-adhd-deepwork",
-    title: "Focus Master: ADHD Productivity Systems",
-    subtitle: "Work with Your Brain, Not Against It",
-    author: "Kaito Tanaka",
-    niche: "Productivity & Executive Function",
-    category: "Self-Improvement",
-    price: 12.99,
-    coverUrl: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=800&q=80",
-    description: "Practical time-chunking, dopamine menu building, and frictionless task organization systems engineered specifically for neurodivergent professionals.",
-    rating: 4.87,
-    reviewsCount: 176,
-    salesCount: 1650,
-    pageCount: 120,
-    publishedAt: "2026-03-29",
-    featured: false,
-    formats: ["PDF", "EPUB"],
-    sampleChapter: {
-      title: "Chapter 1: The Dopamine Menu Concept",
-      content: "Neurotypical productivity frameworks rely on rigid discipline and delayed gratification. For an ADHD brain, motivation requires immediate novelty, challenge, or urgency. Here is how to construct a Dopamine Menu..."
-    }
-  },
-  {
-    id: "prod-cyberpunk-neon",
-    title: "Neon Shadows: Tokyo 2088",
-    subtitle: "A High-Octane Cyberpunk Sci-Fi Thriller",
-    author: "Arthur Pendelton",
-    niche: "Cyberpunk Fiction",
-    category: "Fiction & Storytelling",
-    price: 9.99,
-    coverUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80",
-    description: "In a rain-slicked Tokyo megacity ruled by neural tech conglomerates, a rogue data runner stumbles upon an illegal AI consciousness that threatens humanity.",
-    rating: 4.92,
-    reviewsCount: 310,
-    salesCount: 3400,
-    pageCount: 320,
-    publishedAt: "2026-02-14",
-    featured: false,
-    formats: ["PDF", "EPUB"],
-    sampleChapter: {
-      title: "Chapter 1: Rain on Chrome",
-      content: "Neon light spilled across the wet asphalt of Shinjuku Sector 4 like liquid amethyst. Kael adjusted his neural dampener, checking the optical feed for corporate trackers..."
-    }
-  },
-  {
-    id: "prod-no-code-saas",
-    title: "No-Code SaaS Empire",
-    subtitle: "From Zero Code to $10k MRR Micro-SaaS",
-    author: "Devon Miller",
-    niche: "No-Code & Tech Entrepreneurship",
-    category: "Tech & AI",
-    price: 18.99,
-    coverUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80",
-    description: "Build, launch, and monetize software applications without writing a line of code. Covers database design, API webhooks, and automated user onboarding.",
-    rating: 4.88,
-    reviewsCount: 88,
-    salesCount: 970,
-    pageCount: 160,
-    publishedAt: "2026-06-20",
-    featured: false,
-    formats: ["PDF", "EPUB"],
-    sampleChapter: {
-      title: "Chapter 1: Unlocking the No-Code Revolution",
-      content: "The barrier to creating software has completely dissolved. Visual builder platforms and AI integration layers allow non-technical founders to launch production-grade SaaS products in days rather than months..."
-    }
+  "engines": {
+    "node": ">=20"
   }
-];
+}
