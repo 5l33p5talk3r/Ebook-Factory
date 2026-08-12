@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /creator
+Disallow: /api/
+Sitemap: https://ebookfactory.org/sitemap.xml
