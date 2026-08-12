@@ -1,0 +1,349 @@
+import { FEATURED_PRODUCTS } from "../data/mockStorefront";
+
+// Shared idempotency cache for completed captures across server requests
+export const processedCaptures = new Map<string, any>();
+export const processedWebhooks = new Set<string>();
+
+export function getPayPalBaseUrl(paypalEnv?: string): string {
+  const env = (paypalEnv || "").toLowerCase();
+  if (env === "live" || env === "production") {
+    return "https://api-m.paypal.com";
+  }
+  return "https://api-m.sandbox.paypal.com";
+}
+
+export async function getPayPalAccessToken(
+  clientId: string,
+  clientSecret: string,
+  paypalEnv?: string
+): Promise<string> {
+  if (!clientId || !clientSecret) {
+    throw new Error("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required on the server.");
+  }
+
+  const baseUrl = getPayPalBaseUrl(paypalEnv);
+  const rawAuth = `${clientId.trim()}:${clientSecret.trim()}`;
+  const authHeader = typeof Buffer !== "undefined"
+    ? Buffer.from(rawAuth).toString("base64")
+    : btoa(rawAuth);
+
+  const res = await fetch(`${baseUrl}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${authHeader}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: "grant_type=client_credentials"
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`PayPal OAuth authentication failed (${res.status}): ${errorText}`);
+  }
+
+  const data = (await res.json()) as any;
+  if (!data.access_token) {
+    throw new Error("PayPal OAuth did not return an access token.");
+  }
+
+  return data.access_token;
+}
+
+export function calculateCartTotal(rawItems: any[]): {
+  totalAmount: string;
+  validatedItems: Array<{ id: string; title: string; price: number; quantity: number }>;
+} {
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    throw new Error("Cart must contain at least one item.");
+  }
+
+  const catalogMap = new Map<string, number>();
+  for (const p of FEATURED_PRODUCTS) {
+    catalogMap.set(p.id, p.price);
+  }
+
+  let total = 0;
+  const validatedItems: Array<{ id: string; title: string; price: number; quantity: number }> = [];
+
+  for (const rawItem of rawItems) {
+    const product = rawItem.product || rawItem;
+    const productId = product.id || rawItem.id || rawItem.productId;
+    const title = product.title || rawItem.title || "Digital Ebook";
+    const quantity = Math.max(1, parseInt(rawItem.quantity || 1, 10));
+
+    let price: number;
+    if (productId && catalogMap.has(productId)) {
+      price = catalogMap.get(productId)!;
+    } else if (typeof product.price === "number" && !isNaN(product.price) && product.price > 0) {
+      price = product.price;
+    } else if (typeof rawItem.price === "number" && !isNaN(rawItem.price) && rawItem.price > 0) {
+      price = rawItem.price;
+    } else {
+      price = 19.99;
+    }
+
+    total += price * quantity;
+    validatedItems.push({
+      id: productId || `item-${Math.random().toString(36).substring(2, 8)}`,
+      title,
+      price,
+      quantity
+    });
+  }
+
+  const formattedTotal = (Math.round(total * 100) / 100).toFixed(2);
+  return { totalAmount: formattedTotal, validatedItems };
+}
+
+export async function createPayPalOrder(
+  clientId: string,
+  clientSecret: string,
+  paypalEnv: string,
+  rawItems: any[]
+) {
+  const { totalAmount, validatedItems } = calculateCartTotal(rawItems);
+  const accessToken = await getPayPalAccessToken(clientId, clientSecret, paypalEnv);
+  const baseUrl = getPayPalBaseUrl(paypalEnv);
+
+  const requestId = `create-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+  const orderPayload = {
+    intent: "CAPTURE",
+    purchase_units: [
+      {
+        reference_id: "default",
+        amount: {
+          currency_code: "USD",
+          value: totalAmount,
+          breakdown: {
+            item_total: {
+              currency_code: "USD",
+              value: totalAmount
+            }
+          }
+        },
+        items: validatedItems.map((item) => ({
+          name: item.title.slice(0, 120),
+          unit_amount: {
+            currency_code: "USD",
+            value: item.price.toFixed(2)
+          },
+          quantity: item.quantity.toString(),
+          category: "DIGITAL_GOODS"
+        }))
+      }
+    ],
+    application_context: {
+      shipping_preference: "NO_SHIPPING",
+      user_action: "PAY_NOW"
+    }
+  };
+
+  const res = await fetch(`${baseUrl}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": requestId
+    },
+    body: JSON.stringify(orderPayload)
+  });
+
+  const data = (await res.json()) as any;
+
+  if (!res.ok) {
+    const errorMsg = data.message || data.details?.[0]?.description || "PayPal order creation failed";
+    throw new Error(errorMsg);
+  }
+
+  if (!data.id) {
+    throw new Error("PayPal API did not return an order ID.");
+  }
+
+  return {
+    success: true,
+    orderId: data.id,
+    totalAmount,
+    items: validatedItems,
+    paypalOrder: data
+  };
+}
+
+export async function capturePayPalOrder(
+  clientId: string,
+  clientSecret: string,
+  paypalEnv: string,
+  orderId: string,
+  rawItems: any[],
+  customerEmail?: string,
+  customerName?: string
+) {
+  if (!orderId) {
+    throw new Error("Order ID is required to capture payment.");
+  }
+
+  // Idempotent return if already captured
+  if (processedCaptures.has(orderId)) {
+    return processedCaptures.get(orderId);
+  }
+
+  const accessToken = await getPayPalAccessToken(clientId, clientSecret, paypalEnv);
+  const baseUrl = getPayPalBaseUrl(paypalEnv);
+
+  const requestId = `capture-${orderId}`;
+
+  const res = await fetch(`${baseUrl}/v2/checkout/orders/${orderId}/capture`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": requestId
+    },
+    body: JSON.stringify({})
+  });
+
+  const captureData = (await res.json()) as any;
+
+  if (!res.ok) {
+    const errorMsg = captureData.message || captureData.details?.[0]?.description || `PayPal capture failed (${res.status})`;
+    throw new Error(errorMsg);
+  }
+
+  if (captureData.status !== "COMPLETED") {
+    throw new Error(`Order capture failed with status: ${captureData.status}`);
+  }
+
+  const purchaseUnit = captureData.purchase_units?.[0];
+  const captureUnit = purchaseUnit?.payments?.captures?.[0];
+
+  if (captureUnit && captureUnit.status !== "COMPLETED") {
+    throw new Error(`Payment capture unit status is ${captureUnit.status}, expected COMPLETED.`);
+  }
+
+  const payer = captureData.payer || {};
+  const payerEmail = customerEmail || payer.email_address || "customer@example.com";
+  const payerName = customerName || `${payer.name?.given_name || ''} ${payer.name?.surname || ''}`.trim() || "Valued Reader";
+
+  const { totalAmount, validatedItems } = calculateCartTotal(rawItems);
+  const receiptId = `REC-${orderId.slice(-8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+
+  const entitlements = validatedItems.map((item) => ({
+    productId: item.id,
+    title: item.title,
+    accessGranted: true,
+    formats: ["PDF", "EPUB"],
+    downloadKey: `DL-${item.id}-${Date.now().toString(36)}`,
+    purchasedAt: new Date().toISOString(),
+    receiptId
+  }));
+
+  const result = {
+    success: true,
+    orderId,
+    receiptId,
+    status: captureData.status,
+    customerEmail: payerEmail,
+    customerName: payerName,
+    totalAmount: parseFloat(totalAmount),
+    items: validatedItems,
+    entitlements,
+    purchasedAt: new Date().toISOString()
+  };
+
+  processedCaptures.set(orderId, result);
+  return result;
+}
+
+export async function verifyAndProcessPayPalWebhook(
+  clientId: string,
+  clientSecret: string,
+  paypalEnv: string,
+  webhookId: string,
+  headers: Record<string, string | null | undefined>,
+  rawEventBody: any
+) {
+  if (!webhookId) {
+    throw new Error("PAYPAL_WEBHOOK_ID environment variable is missing on the server.");
+  }
+
+  const authAlgo = headers["paypal-auth-algo"];
+  const certUrl = headers["paypal-cert-url"];
+  const transmissionId = headers["paypal-transmission-id"];
+  const transmissionSig = headers["paypal-transmission-sig"];
+  const transmissionTime = headers["paypal-transmission-time"];
+
+  if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) {
+    throw new Error("Missing required PayPal webhook signature headers.");
+  }
+
+  const accessToken = await getPayPalAccessToken(clientId, clientSecret, paypalEnv);
+  const baseUrl = getPayPalBaseUrl(paypalEnv);
+
+  const verificationPayload = {
+    auth_algo: authAlgo,
+    cert_url: certUrl,
+    transmission_id: transmissionId,
+    transmission_sig: transmissionSig,
+    transmission_time: transmissionTime,
+    webhook_id: webhookId,
+    webhook_event: rawEventBody
+  };
+
+  const verifyRes = await fetch(`${baseUrl}/v1/notifications/verify-webhook-signature`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(verificationPayload)
+  });
+
+  if (!verifyRes.ok) {
+    const errText = await verifyRes.text();
+    throw new Error(`Webhook signature verification request failed (${verifyRes.status}): ${errText}`);
+  }
+
+  const verifyData = (await verifyRes.json()) as any;
+  if (verifyData.verification_status !== "SUCCESS") {
+    throw new Error(`PayPal webhook signature verification failed. Verification status: ${verifyData.verification_status}`);
+  }
+
+  const eventId = rawEventBody.id || transmissionId;
+  if (processedWebhooks.has(eventId)) {
+    return {
+      success: true,
+      message: "Webhook event already processed (idempotent).",
+      eventId,
+      verificationStatus: "SUCCESS"
+    };
+  }
+
+  processedWebhooks.add(eventId);
+
+  const eventType = rawEventBody.event_type;
+  const resource = rawEventBody.resource || {};
+
+  if (eventType === "PAYMENT.CAPTURE.COMPLETED" || eventType === "CHECKOUT.ORDER.APPROVED") {
+    const resourceId = resource.id;
+    if (resourceId && !processedCaptures.has(resourceId)) {
+      processedCaptures.set(resourceId, {
+        success: true,
+        orderId: resourceId,
+        receiptId: `REC-${resourceId.slice(-8).toUpperCase()}`,
+        status: "COMPLETED",
+        customerEmail: resource.payer?.email_address || "customer@example.com",
+        customerName: `${resource.payer?.name?.given_name || ''} ${resource.payer?.name?.surname || ''}`.trim() || "Valued Reader",
+        purchasedAt: new Date().toISOString(),
+        reconciledViaWebhook: true
+      });
+    }
+  }
+
+  return {
+    success: true,
+    message: `PayPal webhook signature verified and processed successfully (${eventType})`,
+    eventId,
+    eventType,
+    verificationStatus: "SUCCESS"
+  };
+}
