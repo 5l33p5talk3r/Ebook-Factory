@@ -30,21 +30,30 @@ app.post('/api/creator/project', requireAdmin, (req, res) => {
   return res.status(201).json({ success: true, project: { id: crypto.randomUUID(), title: title.trim(), niche: niche.trim(), status: 'draft', createdAt: new Date().toISOString() } });
 });
 
-app.post('/api/checkout/quote', requireAuth, (_req: AuthenticatedRequest, res) => {
-  const ids = Array.isArray(_req.body?.productIds) ? _req.body.productIds.filter((id: unknown): id is string => typeof id === 'string') : [];
-  const products = ids.map(id => getProduct(id)).filter(Boolean);
-  if (!products.length || products.length !== ids.length) return res.status(400).json({ success: false, error: 'One or more products are invalid.' });
-  const total = products.reduce((sum, product) => sum + (product?.price || 0), 0);
-  return res.json({ success: true, currency: 'USD', items: products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })), total: Number(total.toFixed(2)) });
+function productIdsFromRequest(body: unknown) {
+  const value = (body as { productIds?: unknown } | null)?.productIds;
+  if (!Array.isArray(value) || value.length === 0 || value.length > 50) return null;
+  const ids = value.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  return ids.length === value.length ? [...new Set(ids)] : null;
+}
+
+app.post('/api/checkout/quote', requireAuth, (req: AuthenticatedRequest, res) => {
+  const ids = productIdsFromRequest(req.body);
+  if (!ids) return res.status(400).json({ success: false, error: 'A valid product selection is required.' });
+  const products = ids.map(id => getProduct(id));
+  if (products.some(product => !product)) return res.status(400).json({ success: false, error: 'One or more products are invalid.' });
+  const totalCents = products.reduce((sum, product) => sum + Math.round((product?.price || 0) * 100), 0);
+  return res.json({ success: true, currency: 'USD', items: products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })), total: (totalCents / 100).toFixed(2) });
 });
 
 app.post('/api/paypal/create-order', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const { createPayPalOrder } = await import('./src/services/paypalServer');
-    const ids = Array.isArray(req.body?.productIds) ? req.body.productIds.filter((id: unknown): id is string => typeof id === 'string') : [];
-    const products = ids.map(id => getProduct(id)).filter(Boolean);
-    if (!products.length || products.length !== ids.length) return res.status(400).json({ success: false, error: 'Invalid product selection.' });
-    const result = await createPayPalOrder(products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })));
+    const ids = productIdsFromRequest(req.body);
+    if (!ids) return res.status(400).json({ success: false, error: 'A valid product selection is required.' });
+    const products = ids.map(id => getProduct(id));
+    if (products.some(product => !product)) return res.status(400).json({ success: false, error: 'One or more products are invalid.' });
+    const result = await createPayPalOrder(products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })), req.user.uid);
     return res.json(result);
   } catch (error) {
     console.error(error);
@@ -55,8 +64,8 @@ app.post('/api/paypal/create-order', requireAuth, async (req: AuthenticatedReque
 app.post('/api/paypal/capture-order', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const { capturePayPalOrder } = await import('./src/services/paypalServer');
-    if (typeof req.body?.orderId !== 'string' || !req.body.orderId.trim()) return res.status(400).json({ success: false, error: 'PayPal order ID is required.' });
-    const result = await capturePayPalOrder(req.body.orderId.trim());
+    if (typeof req.body?.orderId !== 'string' || !/^[A-Za-z0-9_-]{10,80}$/.test(req.body.orderId.trim())) return res.status(400).json({ success: false, error: 'A valid PayPal order ID is required.' });
+    const result = await capturePayPalOrder(req.body.orderId.trim(), req.user.uid);
     return res.json(result);
   } catch (error) {
     console.error(error);
@@ -66,7 +75,7 @@ app.post('/api/paypal/capture-order', requireAuth, async (req: AuthenticatedRequ
 
 app.post('/api/admin/publish', requireAdmin, (req, res) => {
   const { projectId, platforms } = req.body || {};
-  if (typeof projectId !== 'string' || !projectId.trim() || !Array.isArray(platforms) || platforms.length === 0) return res.status(400).json({ success: false, error: 'Project ID and at least one platform are required.' });
+  if (typeof projectId !== 'string' || !projectId.trim() || !Array.isArray(platforms) || platforms.length === 0 || platforms.length > 10) return res.status(400).json({ success: false, error: 'Project ID and at least one platform are required.' });
   return res.status(202).json({ success: true, status: 'queued', jobId: crypto.randomUUID(), projectId: projectId.trim(), platforms });
 });
 
