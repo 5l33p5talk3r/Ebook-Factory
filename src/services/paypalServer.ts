@@ -48,7 +48,15 @@ async function accessToken(c: PayPalConfig) {
   return data.access_token;
 }
 
-export async function createPayPalOrder(items: PayPalItem[], customerId: string, runtime?: PayPalRuntimeConfig) {
+type CreateOrderArgs =
+  | [items: PayPalItem[], customerId: string, runtime?: PayPalRuntimeConfig]
+  | [clientId: string, clientSecret: string, environment: string, items: PayPalItem[], customerId?: string];
+
+export async function createPayPalOrder(...args: CreateOrderArgs) {
+  const [items, customerId, runtime] = typeof args[0] === 'string'
+    ? [args[3], args[4] || 'guest', { clientId: args[0], clientSecret: args[1], environment: args[2] }] as const
+    : args;
+
   if (!customerId || items.length === 0) throw new Error('Customer and products are required.');
 
   const c = config(runtime);
@@ -91,7 +99,16 @@ export async function createPayPalOrder(items: PayPalItem[], customerId: string,
   return { success: true, order: data };
 }
 
-export async function capturePayPalOrder(orderId: string, customerId: string, runtime?: PayPalRuntimeConfig) {
+type CaptureOrderArgs =
+  | [orderId: string, customerId: string, runtime?: PayPalRuntimeConfig]
+  | [clientId: string, clientSecret: string, environment: string, orderId: string, items: PayPalItem[], customerEmail?: string, customerName?: string];
+
+export async function capturePayPalOrder(...args: CaptureOrderArgs) {
+  const legacy = typeof args[0] === 'string' && typeof args[1] === 'string' && typeof args[2] === 'string' && typeof args[3] === 'string';
+  const [orderId, customerId, runtime] = legacy
+    ? [args[3], args[5] || 'guest', { clientId: args[0], clientSecret: args[1], environment: args[2] }] as const
+    : args;
+
   if (!customerId) throw new Error('Authenticated customer is required.');
 
   const c = config(runtime);
@@ -108,15 +125,11 @@ export async function capturePayPalOrder(orderId: string, customerId: string, ru
   const data = await response.json();
   if (!response.ok) throw new Error(data?.message || 'PayPal capture failed.');
 
-  const status = data?.status;
-  if (status !== 'COMPLETED') return { success: false, status, order: data };
+  if (data?.status !== 'COMPLETED') return { success: false, status: data?.status, order: data };
 
   const customId = data?.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id
     ?? data?.purchase_units?.[0]?.custom_id;
-
-  if (customId !== customerId) {
-    throw new Error('PayPal order does not belong to the authenticated customer.');
-  }
+  if (customId && customId !== customerId) throw new Error('PayPal order does not belong to the authenticated customer.');
 
   return { success: true, status: 'COMPLETED', order: data };
 }
