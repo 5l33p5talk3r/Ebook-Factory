@@ -1,15 +1,21 @@
 type PayPalItem = { id: string; title: string; price: number };
 
 type PayPalConfig = { clientId: string; clientSecret: string; baseUrl: string };
+export type PayPalRuntimeConfig = {
+  clientId: string;
+  clientSecret: string;
+  environment?: string;
+};
 
-function config(): PayPalConfig {
-  const clientId = process.env.PAYPAL_CLIENT_ID;
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+function config(overrides?: PayPalRuntimeConfig): PayPalConfig {
+  const clientId = overrides?.clientId ?? process.env.PAYPAL_CLIENT_ID;
+  const clientSecret = overrides?.clientSecret ?? process.env.PAYPAL_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error('PayPal credentials are not configured.');
+  const environment = overrides?.environment ?? process.env.PAYPAL_ENVIRONMENT;
   return {
     clientId,
     clientSecret,
-    baseUrl: process.env.PAYPAL_ENVIRONMENT === 'live'
+    baseUrl: environment === 'live'
       ? 'https://api-m.paypal.com'
       : 'https://api-m.sandbox.paypal.com'
   };
@@ -25,10 +31,13 @@ function priceToCents(price: number) {
 }
 
 async function accessToken(c: PayPalConfig) {
+  const basic = typeof btoa === 'function'
+    ? btoa(`${c.clientId}:${c.clientSecret}`)
+    : Buffer.from(`${c.clientId}:${c.clientSecret}`).toString('base64');
   const response = await fetch(`${c.baseUrl}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${Buffer.from(`${c.clientId}:${c.clientSecret}`).toString('base64')}`,
+      Authorization: `Basic ${basic}`,
       'Content-Type': 'application/x-www-form-urlencoded'
     },
     body: 'grant_type=client_credentials'
@@ -39,10 +48,10 @@ async function accessToken(c: PayPalConfig) {
   return data.access_token;
 }
 
-export async function createPayPalOrder(items: PayPalItem[], customerId: string) {
+export async function createPayPalOrder(items: PayPalItem[], customerId: string, runtime?: PayPalRuntimeConfig) {
   if (!customerId || items.length === 0) throw new Error('Customer and products are required.');
 
-  const c = config();
+  const c = config(runtime);
   const token = await accessToken(c);
   const totalCents = items.reduce((sum, item) => sum + priceToCents(item.price), 0);
   const referenceId = crypto.randomUUID();
@@ -82,10 +91,10 @@ export async function createPayPalOrder(items: PayPalItem[], customerId: string)
   return { success: true, order: data };
 }
 
-export async function capturePayPalOrder(orderId: string, customerId: string) {
+export async function capturePayPalOrder(orderId: string, customerId: string, runtime?: PayPalRuntimeConfig) {
   if (!customerId) throw new Error('Authenticated customer is required.');
 
-  const c = config();
+  const c = config(runtime);
   const token = await accessToken(c);
   const response = await fetch(`${c.baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
     method: 'POST',
