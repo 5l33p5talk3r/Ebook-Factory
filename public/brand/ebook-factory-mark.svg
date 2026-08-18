@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Ebook Factory mark</title><desc id="desc">Open book and upward arrow mark.</desc>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43E8FF"/><stop offset="1" stop-color="#2B72FF"/></linearGradient></defs>
+<rect width="512" height="512" rx="104" fill="#06111D"/>
+<path d="M256 96 100 158v246l156-99 156 99V158z" fill="none" stroke="url(#g)" stroke-width="25" stroke-linejoin="round"/>
+<path d="M256 125v181M136 185l120 72 120-72" fill="none" stroke="url(#g)" stroke-width="20" stroke-linecap="round"/>
+<path d="M282 310 414 178h-64v-48h115v115h-48v-58L305 344z" fill="url(#g)"/>
+</svg>
