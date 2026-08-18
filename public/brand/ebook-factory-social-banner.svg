@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+<title id="title">Ebook Factory social banner</title><desc id="desc">Dark technology-inspired Ebook Factory brand banner.</desc>
+<defs>
+ <radialGradient id="bg"><stop offset="0" stop-color="#123B55"/><stop offset=".52" stop-color="#081A2A"/><stop offset="1" stop-color="#030912"/></radialGradient>
+ <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43E8FF"/><stop offset="1" stop-color="#2B72FF"/></linearGradient>
+ <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#1A5574" stroke-opacity=".22"/></pattern>
+</defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<rect width="1600" height="900" fill="url(#grid)"/>
+<g opacity=".25" fill="none" stroke="#36CDEB"><path d="M0 680h280l90-90h270l90-90h290l90-90h300"/><path d="M0 735h230l80-80h330l80-80h260l100-100h420"/><path d="M1100 0v220l-80 80v190l-120 120"/></g>
+<g transform="translate(165 205)"><rect width="490" height="490" rx="100" fill="#06111D" stroke="#1B6A8C" stroke-width="3"/><path d="M245 100 95 160v240l150-95 150 95V160z" fill="none" stroke="url(#g)" stroke-width="24" stroke-linejoin="round"/><path d="M245 128v176M130 185l115 69 115-69" fill="none" stroke="url(#g)" stroke-width="19" stroke-linecap="round"/><path d="M270 306 398 178h-60v-45h110v110h-45v-55L292 340z" fill="url(#g)"/></g>
+<text x="770" y="405" font-family="Inter,Arial,sans-serif" font-size="108" font-weight="800" letter-spacing="-4" fill="#F0FAFF">ebook</text>
+<text x="772" y="515" font-family="Inter,Arial,sans-serif" font-size="108" font-weight="800" letter-spacing="-3" fill="url(#g)">FACTORY</text>
+<text x="778" y="575" font-family="Inter,Arial,sans-serif" font-size="27" font-weight="600" letter-spacing="8" fill="#86ABC4">LEARN • BUILD • CREATE</text>
+<text x="778" y="630" font-family="Inter,Arial,sans-serif" font-size="23" fill="#B4CBD9">Practical ebooks &amp; digital resources</text>
+</svg>
