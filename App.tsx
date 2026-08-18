@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowRight, BookOpen, Check, ChevronDown, Factory, Library, Menu,
+  ArrowRight, BookOpen, Check, ChevronDown, Library, Menu,
   Search, ShieldCheck, Sparkles, Star, X, Zap
 } from 'lucide-react';
 
@@ -47,19 +47,14 @@ export default function App() {
   }), [products, category, query]);
 
   const total = cart.reduce((sum, product) => sum + product.price, 0);
-
-  const addToCart = (product: Product) => {
-    setCart(current => current.some(item => item.id === product.id) ? current : [...current, product]);
-  };
-
+  const addToCart = (product: Product) => setCart(current => current.some(item => item.id === product.id) ? current : [...current, product]);
   const scrollToStore = () => document.getElementById('store')?.scrollIntoView({ behavior: 'smooth' });
 
   return (
     <div className="site-shell">
       <header className="nav">
         <a className="brand" href="#top" aria-label="Ebook Factory home">
-          <span className="brand-mark"><Factory size={19} /></span>
-          <span>Ebook<span className="brand-accent">Factory</span></span>
+          <img className="brand-logo" src="/brand/ebook-factory-logo.svg" alt="Ebook Factory — Digital Marketplace" />
         </a>
         <nav className={`nav-links ${mobileOpen ? 'open' : ''}`}>
           <a href="#store" onClick={() => setMobileOpen(false)}>Store</a>
@@ -93,9 +88,7 @@ export default function App() {
           <div className="hero-card">
             <div className="card-top"><span>FACTORY PIPELINE</span><span className="live-dot">LIVE</span></div>
             {['Niche opportunity', 'Book outline', 'Manuscript', 'Cover & packaging', 'Store listing'].map((step, i) => (
-              <div className="pipeline-step" key={step}>
-                <span className="step-number">0{i + 1}</span><span>{step}</span><Check size={15} />
-              </div>
+              <div className="pipeline-step" key={step}><span className="step-number">0{i + 1}</span><span>{step}</span><Check size={15} /></div>
             ))}
             <div className="pipeline-footer">One workflow. From idea to product.</div>
           </div>
@@ -114,15 +107,13 @@ export default function App() {
             <div className="search-box"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search books..." aria-label="Search books" /></div>
           </div>
           <div className="category-row">{categories.map(item => <button key={item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
-          <div className="product-grid">
-            {filtered.map(product => <ProductCard key={product.id} product={product} added={cart.some(item => item.id === product.id)} onAdd={() => addToCart(product)} />)}
-          </div>
+          <div className="product-grid">{filtered.map(product => <ProductCard key={product.id} product={product} added={cart.some(item => item.id === product.id)} onAdd={() => addToCart(product)} />)}</div>
           {!filtered.length && <div className="empty-state">No books matched your search.</div>}
         </section>
 
         <section id="factory" className="section factory-section">
           <div className="factory-panel">
-            <div className="factory-copy"><div className="eyebrow">THE EBOOK FACTORY</div><h2>Build the business behind the book.</h2><p>The Factory is designed around the entire publishing lifecycle instead of stopping at AI text generation.</p><div className="feature-list"><div><Sparkles /><span><b>Niche Intelligence</b><small>Identify commercially useful topics and buyer intent.</small></span></div><div><BookOpen /><span><b>Creator Studio</b><small>Develop, edit, organize, and package the manuscript.</small></span></div><div><Zap /><span><b>Publishing Pipeline</b><small>Move finished books toward your storefront and distribution workflow.</small></span></div></div><button className="button primary" onClick={() => alert('Creator Studio is reserved for authenticated creators.')} >Open Creator Studio <ArrowRight size={17} /></button></div>
+            <div className="factory-copy"><div className="eyebrow">THE EBOOK FACTORY</div><h2>Build the business behind the book.</h2><p>The Factory is designed around the entire publishing lifecycle instead of stopping at AI text generation.</p><div className="feature-list"><div><Sparkles /><span><b>Niche Intelligence</b><small>Identify commercially useful topics and buyer intent.</small></span></div><div><BookOpen /><span><b>Creator Studio</b><small>Develop, edit, organize, and package the manuscript.</small></span></div><div><Zap /><span><b>Publishing Pipeline</b><small>Move finished books toward your storefront and distribution workflow.</small></span></div></div><button className="button primary" onClick={() => alert('Creator Studio is reserved for authenticated creators.')}>Open Creator Studio <ArrowRight size={17} /></button></div>
             <div className="factory-visual"><div className="visual-header">PROJECT STATUS <span>READY</span></div><div className="visual-book"><div className="book-cover"><span>YOUR<br />NEXT<br /><strong>BOOK</strong></span></div><div><small>PROJECT</small><h3>From niche to published product</h3><div className="progress"><span style={{ width: '78%' }} /></div><p>78% complete</p></div></div></div>
           </div>
         </section>
@@ -132,7 +123,7 @@ export default function App() {
         <section id="about" className="cta-section"><div className="eyebrow">EBOOK FACTORY</div><h2>Your next digital product starts here.</h2><p>Research smarter. Create faster. Build a catalog you own.</p><button className="button primary" onClick={scrollToStore}>Start browsing <ArrowRight size={17} /></button></section>
       </main>
 
-      <footer><div className="footer-brand"><span className="brand-mark"><Factory size={17} /></span><b>EbookFactory</b></div><span>© {new Date().getFullYear()} Ebook Factory</span><a href="mailto:bishopn45@ebookfactory.org">bishopn45@ebookfactory.org</a><span>ebookfactory.org</span></footer>
+      <footer><div className="footer-brand"><img className="footer-mark" src="/brand/ebook-factory-mark.svg" alt="" aria-hidden="true" /><b>Ebook Factory</b></div><span>© {new Date().getFullYear()} Ebook Factory</span><a href="mailto:bishopn45@ebookfactory.org">bishopn45@ebookfactory.org</a><span>ebookfactory.org</span></footer>
 
       {showCart && <div className="modal-backdrop" onClick={() => setShowCart(false)}><aside className="cart-panel" onClick={e => e.stopPropagation()}><div className="cart-header"><div><small>YOUR CART</small><h3>Digital products</h3></div><button onClick={() => setShowCart(false)} aria-label="Close cart"><X /></button></div>{cart.length ? <><div className="cart-items">{cart.map(item => <div className="cart-item" key={item.id}><div className="mini-cover">EF</div><div><b>{item.title}</b><span>${item.price.toFixed(2)}</span></div></div>)}</div><div className="cart-total"><span>Total</span><strong>${total.toFixed(2)}</strong></div><button className="button primary full" onClick={() => alert('Checkout is connected to the production PayPal API after authentication and deployment secrets are configured.')}>Continue to checkout <ArrowRight size={17} /></button></> : <div className="empty-cart"><Library size={30} /><p>Your cart is empty.</p><button className="button secondary" onClick={() => setShowCart(false)}>Continue shopping</button></div>}</aside></div>}
     </div>
