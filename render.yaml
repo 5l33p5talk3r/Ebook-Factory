@@ -16,6 +16,10 @@ services:
         value: production
       - key: PUBLIC_BASE_URL
         value: https://ebookfactory.org
+      - key: APP_ORIGIN
+        value: https://ebookfactory.org
+      - key: TRUST_PROXY
+        value: "true"
       - key: PAYPAL_ENVIRONMENT
         value: sandbox
       - key: PAYPAL_CLIENT_ID
@@ -24,5 +28,7 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_SSL
+        value: "true"
       - key: SESSION_SECRET
         sync: false
