@@ -4,9 +4,9 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
-import { PRODUCTS, getProduct } from './data/products';
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from './server/auth';
 import { apiRateLimit, requestSecurity } from './server/security';
+import { ensureCustomer, fulfillCapturedOrder, getLibrary, getPublishedProducts } from './src/services/postgresCommerce';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,12 +20,31 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/api', apiRateLimit());
 
-app.get('/api/health', (_req, res) => res.json({ success: true, service: 'ebook-factory', status: 'healthy', timestamp: new Date().toISOString() }));
-app.get('/api/products', (_req, res) => res.json({ success: true, products: PRODUCTS }));
-app.get('/api/products/:id', (req, res) => {
-  const product = getProduct(req.params.id);
-  if (!product) return res.status(404).json({ success: false, error: 'Product not found.' });
-  return res.json({ success: true, product });
+app.get('/api/health', async (_req, res) => {
+  try {
+    const { getPool } = await import('./src/db/postgres');
+    await getPool().query('SELECT 1');
+    return res.json({ success: true, service: 'ebook-factory', status: 'healthy', database: 'healthy', timestamp: new Date().toISOString() });
+  } catch {
+    return res.status(503).json({ success: false, service: 'ebook-factory', status: 'degraded', database: 'unavailable' });
+  }
+});
+
+app.get('/api/products', async (_req, res) => {
+  try { return res.json({ success: true, products: await getPublishedProducts() }); }
+  catch (error) { console.error(error); return res.status(503).json({ success: false, error: 'Product catalog unavailable.' }); }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const products = await getPublishedProducts([req.params.id]);
+    return res.json({ success: true, product: products[0] });
+  } catch { return res.status(404).json({ success: false, error: 'Product not found.' }); }
+});
+
+app.get('/api/library', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try { return res.json({ success: true, products: await getLibrary(req.user!.uid) }); }
+  catch (error) { console.error(error); return res.status(503).json({ success: false, error: 'Customer library unavailable.' }); }
 });
 
 app.post('/api/creator/project', requireAdmin, (req, res) => {
@@ -41,40 +60,42 @@ function productIdsFromRequest(body: unknown) {
   return ids.length === value.length ? [...new Set(ids)] : null;
 }
 
-app.post('/api/checkout/quote', requireAuth, (req: AuthenticatedRequest, res) => {
-  const ids = productIdsFromRequest(req.body);
-  if (!ids) return res.status(400).json({ success: false, error: 'A valid product selection is required.' });
-  const products = ids.map(id => getProduct(id));
-  if (products.some(product => !product)) return res.status(400).json({ success: false, error: 'One or more products are invalid.' });
-  const totalCents = products.reduce((sum, product) => sum + Math.round((product?.price || 0) * 100), 0);
-  return res.json({ success: true, currency: 'USD', items: products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })), total: (totalCents / 100).toFixed(2) });
+app.post('/api/checkout/quote', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    await ensureCustomer(req.user!.uid, req.user!.email);
+    const ids = productIdsFromRequest(req.body);
+    if (!ids) return res.status(400).json({ success: false, error: 'A valid product selection is required.' });
+    const products = await getPublishedProducts(ids);
+    const totalCents = products.reduce((sum, product) => sum + product.price_cents, 0);
+    return res.json({ success: true, currency: products[0]?.currency || 'USD', items: products.map(p => ({ id: p.id, title: p.title, price: (p.price_cents / 100).toFixed(2) })), total: (totalCents / 100).toFixed(2) });
+  } catch (error) { console.error(error); return res.status(400).json({ success: false, error: error instanceof Error ? error.message : 'Unable to create quote.' }); }
 });
 
 app.post('/api/paypal/create-order', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    await ensureCustomer(req.user!.uid, req.user!.email);
     const { createPayPalOrder } = await import('./src/services/paypalServer');
     const ids = productIdsFromRequest(req.body);
     if (!ids) return res.status(400).json({ success: false, error: 'A valid product selection is required.' });
-    const products = ids.map(id => getProduct(id));
-    if (products.some(product => !product)) return res.status(400).json({ success: false, error: 'One or more products are invalid.' });
-    const result = await createPayPalOrder(products.map(p => ({ id: p!.id, title: p!.title, price: p!.price })), req.user.uid);
+    const products = await getPublishedProducts(ids);
+    const result = await createPayPalOrder(products.map(p => ({ id: p.id, title: p.title, price: p.price_cents / 100 })), req.user!.uid);
     return res.json(result);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, error: 'Unable to create payment order.' });
-  }
+  } catch (error) { console.error(error); return res.status(500).json({ success: false, error: 'Unable to create payment order.' }); }
 });
 
 app.post('/api/paypal/capture-order', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
+    await ensureCustomer(req.user!.uid, req.user!.email);
     const { capturePayPalOrder } = await import('./src/services/paypalServer');
     if (typeof req.body?.orderId !== 'string' || !/^[A-Za-z0-9_-]{10,80}$/.test(req.body.orderId.trim())) return res.status(400).json({ success: false, error: 'A valid PayPal order ID is required.' });
-    const result = await capturePayPalOrder(req.body.orderId.trim(), req.user.uid);
-    return res.json(result);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, error: 'Unable to capture payment.' });
-  }
+    const paypalResult = await capturePayPalOrder(req.body.orderId.trim(), req.user!.uid);
+    if (!paypalResult.success) return res.status(409).json(paypalResult);
+    const ids = productIdsFromRequest(req.body);
+    if (!ids) return res.status(400).json({ success: false, error: 'Product selection is required to fulfill the order.' });
+    const products = await getPublishedProducts(ids);
+    const fulfillment = await fulfillCapturedOrder(req.user!.uid, req.body.orderId.trim(), paypalResult.order, products);
+    return res.json({ ...paypalResult, fulfillment });
+  } catch (error) { console.error(error); return res.status(500).json({ success: false, error: 'Unable to capture and fulfill payment.' }); }
 });
 
 app.post('/api/admin/publish', requireAdmin, (req, res) => {
