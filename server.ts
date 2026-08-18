@@ -112,7 +112,10 @@ app.post('/api/admin/publish', requireAdmin, (req, res) => {
 
 async function start() {
   if (process.env.NODE_ENV !== 'production') { const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' }); app.use(vite.middlewares); }
-  else { app.use(express.static(path.join(__dirname, 'dist'))); app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html'))); }
+  else {
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('/*splat', (_req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
+  }
   app.listen(PORT, '0.0.0.0', () => console.log(`Ebook Factory running on port ${PORT}`));
 }
 start().catch(error => { console.error(error); process.exit(1); });
