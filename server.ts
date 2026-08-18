@@ -7,6 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from './server/auth';
 import { apiRateLimit, requestSecurity } from './server/security';
 import { ensureCustomer, createPendingOrder, fulfillCapturedOrder, getLibrary, getOrderProducts, getPublishedProducts } from './src/services/postgresCommerce';
+import { getAuthorizedEbook } from './src/services/ebookDelivery';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -35,6 +36,19 @@ app.get('/api/products/:id', async (req, res) => {
 app.get('/api/library', requireAuth, async (req: AuthenticatedRequest, res) => {
   try { return res.json({ success: true, products: await getLibrary(req.user!.uid) }); }
   catch (error) { console.error(error); return res.status(503).json({ success: false, error: 'Customer library unavailable.' }); }
+});
+
+app.get('/api/library/:productId/download/:format', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const format = req.params.format === 'pdf' || req.params.format === 'epub' ? req.params.format : null;
+    if (!format) return res.status(400).json({ success: false, error: 'Unsupported ebook format.' });
+    const ebook = await getAuthorizedEbook(req.user!.uid, req.params.productId, format);
+    if (!ebook) return res.status(404).json({ success: false, error: 'Ebook is not available for this account.' });
+    res.setHeader('Content-Length', String(ebook.size));
+    res.setHeader('Content-Disposition', `attachment; filename="${ebook.title.replace(/[^a-z0-9._ -]/gi, '_')}.${format}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.sendFile(ebook.filePath);
+  } catch (error) { console.error(error); return res.status(404).json({ success: false, error: 'Ebook is not available.' }); }
 });
 
 app.post('/api/creator/project', requireAdmin, (req, res) => {
