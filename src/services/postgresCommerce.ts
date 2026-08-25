@@ -63,3 +63,19 @@ export async function getLibrary(userId: string) {
   const result = await getPool().query(`SELECT p.id,p.title,p.slug,p.description,p.cover_url,p.pdf_key,p.epub_key,e.granted_at FROM entitlements e JOIN products p ON p.id=e.product_id WHERE e.user_id=$1 AND e.status='active' AND p.status='published' ORDER BY e.granted_at DESC`, [userId]);
   return result.rows;
 }
+
+export type AdminProductInput = { id:string; title:string; slug:string; description:string; price_cents:number; currency:string; cover_url:string|null; pdf_key:string|null; epub_key:string|null; status:'draft'|'published'|'archived' };
+
+export async function getAdminProducts() {
+  const result = await getPool().query<DbProduct & {status:string}>(`SELECT id,title,slug,description,price_cents,currency,cover_url,pdf_key,epub_key,status FROM products ORDER BY updated_at DESC, created_at DESC`);
+  return result.rows;
+}
+
+export async function upsertAdminProduct(product: AdminProductInput) {
+  const values = [product.id,product.title,product.slug,product.description,product.price_cents,product.currency,product.cover_url,product.pdf_key,product.epub_key,product.status];
+  const result = await getPool().query(`INSERT INTO products (id,title,slug,description,price_cents,currency,cover_url,pdf_key,epub_key,status)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title,slug=EXCLUDED.slug,description=EXCLUDED.description,price_cents=EXCLUDED.price_cents,currency=EXCLUDED.currency,cover_url=EXCLUDED.cover_url,pdf_key=EXCLUDED.pdf_key,epub_key=EXCLUDED.epub_key,status=EXCLUDED.status,updated_at=now()
+    RETURNING id,title,slug,description,price_cents,currency,cover_url,pdf_key,epub_key,status`, values);
+  return result.rows[0];
+}

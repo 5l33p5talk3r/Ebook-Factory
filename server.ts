@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { requireAdmin, requireAuth, type AuthenticatedRequest } from './server/auth';
 import { apiRateLimit, requestSecurity } from './server/security';
-import { ensureCustomer, createPendingOrder, fulfillCapturedOrder, getLibrary, getOrderProducts, getPublishedProducts } from './src/services/postgresCommerce';
+import { ensureCustomer, createPendingOrder, fulfillCapturedOrder, getLibrary, getOrderProducts, getPublishedProducts, getAdminProducts, upsertAdminProduct } from './src/services/postgresCommerce';
 import { getAuthorizedEbook } from './src/services/ebookDelivery';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -102,6 +102,40 @@ app.post('/api/paypal/capture-order', requireAuth, async (req: AuthenticatedRequ
     const fulfillment = await fulfillCapturedOrder(req.user!.uid, orderId, paypalResult.order, products);
     return res.json({ ...paypalResult, fulfillment });
   } catch (error) { console.error(error); return res.status(500).json({ success: false, error: 'Unable to capture and fulfill payment.' }); }
+});
+
+
+app.get('/api/auth/config', (_req, res) => {
+  const firebaseApiKey = process.env.FIREBASE_WEB_API_KEY;
+  if (!firebaseApiKey) return res.status(503).json({ success: false, error: 'Admin sign-in is not configured.' });
+  return res.json({ success: true, firebaseApiKey });
+});
+
+app.get('/api/admin/products', requireAdmin, async (_req, res) => {
+  try { return res.json({ success: true, products: await getAdminProducts() }); }
+  catch (error) { console.error(error); return res.status(503).json({ success: false, error: 'Admin catalog unavailable.' }); }
+});
+
+app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const body = req.body || {};
+    const text = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+    const title = text(body.title, 240), slug = text(body.slug, 240), description = text(body.description, 5000);
+    const currency = text(body.currency, 3).toUpperCase();
+    const price_cents = Number(body.price_cents);
+    const status = body.status === 'published' || body.status === 'archived' ? body.status : 'draft';
+    if (!/^[a-z0-9][a-z0-9-]{1,119}$/.test(id) || !/^[a-z0-9][a-z0-9-]{1,239}$/.test(slug) || !title || !description || !Number.isInteger(price_cents) || price_cents < 0 || !/^[A-Z]{3}$/.test(currency)) {
+      return res.status(400).json({ success: false, error: 'Valid product ID, slug, title, description, price, and currency are required.' });
+    }
+    const nullable = (value: unknown, max: number) => { const normalized = text(value, max); return normalized || null; };
+    const product = await upsertAdminProduct({ id, title, slug, description, price_cents, currency, cover_url: nullable(body.cover_url, 2000), pdf_key: nullable(body.pdf_key, 1000), epub_key: nullable(body.epub_key, 1000), status });
+    return res.json({ success: true, product });
+  } catch (error: any) {
+    console.error(error);
+    const conflict = error?.code === '23505';
+    return res.status(conflict ? 409 : 500).json({ success: false, error: conflict ? 'That product ID or slug already exists.' : 'Unable to save the catalog entry.' });
+  }
 });
 
 app.post('/api/admin/publish', requireAdmin, (req, res) => {

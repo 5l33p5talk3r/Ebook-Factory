@@ -22,7 +22,9 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) return res.status(401).json({ success: false, error: 'Authentication required.' });
     const decoded = await getFirebaseAuth().verifyIdToken(header.slice(7), true);
-    req.user = { uid: decoded.uid, email: decoded.email, admin: decoded.admin === true };
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
+    const emailIsAdmin = typeof decoded.email === 'string' && adminEmails.includes(decoded.email.toLowerCase());
+    req.user = { uid: decoded.uid, email: decoded.email, admin: decoded.admin === true || emailIsAdmin };
     next();
   } catch {
     return res.status(401).json({ success: false, error: 'Invalid or expired authentication token.' });
