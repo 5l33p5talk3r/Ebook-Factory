@@ -10,7 +10,7 @@ const migrationsDir = path.join(root, 'db', 'migrations');
 async function main() {
   const pool = getPool();
   await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-  const files = (await fs.readdir(migrationsDir)).filter(f => f.endsWith('.sql')).sort();
+  const files = (await fs.readdir(migrationsDir)).filter(f => f.endsWith('_postgres.sql')).sort();
   for (const filename of files) {
     const existing = await pool.query('SELECT 1 FROM schema_migrations WHERE filename=$1', [filename]);
     if (existing.rowCount) continue;
